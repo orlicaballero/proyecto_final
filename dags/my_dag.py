@@ -1,15 +1,17 @@
+# my_dag.py
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 import sys
 sys.path.insert(0, '/opt/airflow/dags/scripts')
-import load_data
-import alerting
+from load_data import main as load_data_main
+from api_extraction import main as extract_data_main
+from transform_data import transform_data
 
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2023, 1, 1),
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
@@ -17,22 +19,29 @@ default_args = {
 }
 
 dag = DAG(
-    'crypto_etl',
+    'crypto_pipeline',
     default_args=default_args,
-    description='Un DAG simple para ETL de criptomonedas',
+    description='ETL pipeline for cryptocurrency data',
     schedule_interval=timedelta(days=1),
 )
 
-extract_task = PythonOperator(
+extract_data_task = PythonOperator(
     task_id='extract_data',
-    python_callable=load_data.main,
+    python_callable=extract_data_main,
     dag=dag,
 )
 
-alert_task = PythonOperator(
-    task_id='send_alerts',
-    python_callable=alerting.main,
+transform_data_task = PythonOperator(
+    task_id='transform_data',
+    python_callable=transform_data,
     dag=dag,
 )
 
-extract_task >> alert_task
+load_data_task = PythonOperator(
+    task_id='load_data',
+    python_callable=load_data_main,
+    dag=dag,
+)
+
+extract_data_task >> transform_data_task >> load_data_task
+
