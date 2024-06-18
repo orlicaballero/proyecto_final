@@ -1,6 +1,5 @@
 import psycopg2
 import pandas as pd
-from config.config import REDSHIFT_USER, REDSHIFT_PASSWORD, REDSHIFT_HOST, REDSHIFT_PORT, REDSHIFT_DB
 
 def load_data(df, conn):
     with conn.cursor() as cur:
@@ -34,22 +33,3 @@ def load_data(df, conn):
             """, (row['id'], row['nombre'], row['simbolo'], row['precio_usd'], row['capitalizacion_usd'], row['volumen_24h_usd'], row['variacion_24h'], row['fecha_ingesta']))
         conn.commit()
 
-def main():
-    conn = psycopg2.connect(
-        dbname=REDSHIFT_DB,
-        user=REDSHIFT_USER,
-        password=REDSHIFT_PASSWORD,
-        host=REDSHIFT_HOST,
-        port=REDSHIFT_PORT
-    )
-    
-    from transform_data import transform_data
-    from api_extraction import main as extract_data
-    api_df, db_df = extract_data()
-    combined_df = transform_data(api_df, db_df)
-
-    load_data(combined_df, conn)
-    conn.close()
-
-if __name__ == "__main__":
-    main()
