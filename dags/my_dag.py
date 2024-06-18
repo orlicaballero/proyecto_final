@@ -1,18 +1,27 @@
 from airflow import DAG
-from airflow.operators.python import PythonOperator
-from datetime import datetime
+from airflow.operators.python_operator import PythonOperator
+from datetime import datetime, timedelta
 from scripts.api_extraction import main as extract_data
-from scripts.load_data import load_data
 from scripts.transform_data import transform_data
+from scripts.load_data import load_data
 
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2023, 1, 1),
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
+    'retry_delay': timedelta(minutes=5),
 }
+
+dag = DAG(
+    'crypto_pipeline',
+    default_args=default_args,
+    description='A simple crypto ETL pipeline',
+    schedule_interval=timedelta(days=1),
+    start_date=datetime(2023, 1, 1),
+    catchup=False,
+)
 
 def extract_data_task():
     api_df, db_df = extract_data()
@@ -23,31 +32,39 @@ def transform_data_task(api_df, db_df):
     return combined_df
 
 def load_data_task(combined_df):
-    database_url = "postgresql+psycopg2://user:password@data-engineer-cluster.cyhh5bfevlmn.us-east-1.redshift.amazonaws.com:5439/data-engineer-database"
-    conn = psycopg2.connect(database_url)
+    from scripts.load_data import REDSHIFT_USER, REDSHIFT_PASSWORD, REDSHIFT_HOST, REDSHIFT_PORT, REDSHIFT_DB
+    import psycopg2
+    conn = psycopg2.connect(
+        dbname=REDSHIFT_DB,
+        user=REDSHIFT_USER,
+        password=REDSHIFT_PASSWORD,
+        host=REDSHIFT_HOST,
+        port=REDSHIFT_PORT
+    )
     load_data(combined_df, conn)
     conn.close()
 
-with DAG('crypto_pipeline', default_args=default_args, schedule_interval='@daily') as dag:
-    t1 = PythonOperator(
-        task_id='extract_data',
-        python_callable=extract_data_task,
-        dag=dag
-    )
+extract_task = PythonOperator(
+    task_id='extract_data',
+    python_callable=extract_data_task,
+    dag=dag,
+)
 
-    t2 = PythonOperator(
-        task_id='transform_data',
-        python_callable=transform_data_task,
-        op_kwargs={'api_df': "{{ task_instance.xcom_pull(task_ids='extract_data')[0] }}", 'db_df': "{{ task_instance.xcom_pull(task_ids='extract_data')[1] }}"},
-        dag=dag
-    )
+transform_task = PythonOperator(
+    task_id='transform_data',
+    python_callable=transform_data_task,
+    provide_context=True,
+    dag=dag,
+)
 
-    t3 = PythonOperator(
-        task_id='load_data',
-        python_callable=load_data_task,
-        op_kwargs={'combined_df': "{{ task_instance.xcom_pull(task_ids='transform_data') }}"},
-        dag=dag
-    )
+load_task = PythonOperator(
+    task_id='load_data',
+    python_callable=load_data_task,
+    provide_context=True,
+    dag=dag,
+)
 
-    t1 >> t2 >> t3
+extract_task >> transform_task >> load_task
+
+
 
