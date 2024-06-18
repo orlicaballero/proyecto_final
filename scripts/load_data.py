@@ -33,3 +33,4 @@ def load_data(df, conn):
             """, (row['id'], row['nombre'], row['simbolo'], row['precio_usd'], row['capitalizacion_usd'], row['volumen_24h_usd'], row['variacion_24h'], row['fecha_ingesta']))
         conn.commit()
 
+
