@@ -11,9 +11,7 @@ COPY scripts/ /opt/airflow/dags/scripts/
 COPY sql/ /opt/airflow/sql/
 COPY entrypoint.sh /entrypoint.sh
 
-# Hacer el script ejecutable
-RUN chmod +x /entrypoint.sh
-
 # Usar el script como punto de entrada
 ENTRYPOINT ["/entrypoint.sh"]
+
 
