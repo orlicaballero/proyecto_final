@@ -10,10 +10,10 @@ COPY dags/ /opt/airflow/dags/
 COPY scripts/ /opt/airflow/dags/scripts/
 COPY config/ /opt/airflow/dags/config/
 
-# Copiar y cambiar permisos del script de entrada
+# Copiar el script de entrada (ya tiene permisos ejecutables)
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Usar el script como punto de entrada
 ENTRYPOINT ["/entrypoint.sh"]
+
 
