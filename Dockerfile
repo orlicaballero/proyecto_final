@@ -20,3 +20,4 @@ USER airflow
 # Usar el script como punto de entrada
 ENTRYPOINT ["/entrypoint.sh"]
 
+
