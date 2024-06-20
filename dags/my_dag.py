@@ -1,9 +1,13 @@
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
-from scripts.api_extraction import main as extract_data
-from scripts.transform_data import transform_data
-from scripts.load_data import load_data
+import sys
+sys.path.insert(0, '/opt/airflow/scripts')
+from api_extraction import main as extract_data
+from transform_data import transform_data
+from load_data import load_data
+from alerting import send_alert
+from create_db import create_database
 
 default_args = {
     'owner': 'airflow',
@@ -17,54 +21,42 @@ default_args = {
 dag = DAG(
     'crypto_pipeline',
     default_args=default_args,
-    description='A simple crypto ETL pipeline',
+    description='A simple ETL pipeline for cryptocurrency data',
     schedule_interval=timedelta(days=1),
     start_date=datetime(2023, 1, 1),
     catchup=False,
 )
 
-def extract_data_task():
-    api_df, db_df = extract_data()
-    return api_df, db_df
+create_db_task = PythonOperator(
+    task_id='create_db',
+    python_callable=create_database,
+    dag=dag,
+)
 
-def transform_data_task(api_df, db_df):
-    combined_df = transform_data(api_df, db_df)
-    return combined_df
-
-def load_data_task(combined_df):
-    from scripts.load_data import REDSHIFT_USER, REDSHIFT_PASSWORD, REDSHIFT_HOST, REDSHIFT_PORT, REDSHIFT_DB
-    import psycopg2
-    conn = psycopg2.connect(
-        dbname=REDSHIFT_DB,
-        user=REDSHIFT_USER,
-        password=REDSHIFT_PASSWORD,
-        host=REDSHIFT_HOST,
-        port=REDSHIFT_PORT
-    )
-    load_data(combined_df, conn)
-    conn.close()
-
-extract_task = PythonOperator(
+extract_data_task = PythonOperator(
     task_id='extract_data',
-    python_callable=extract_data_task,
+    python_callable=extract_data,
     dag=dag,
 )
 
-transform_task = PythonOperator(
+transform_data_task = PythonOperator(
     task_id='transform_data',
-    python_callable=transform_data_task,
-    provide_context=True,
+    python_callable=transform_data,
     dag=dag,
 )
 
-load_task = PythonOperator(
+load_data_task = PythonOperator(
     task_id='load_data',
-    python_callable=load_data_task,
-    provide_context=True,
+    python_callable=load_data,
     dag=dag,
 )
 
-extract_task >> transform_task >> load_task
+alert_task = PythonOperator(
+    task_id='send_alert',
+    python_callable=send_alert,
+    dag=dag,
+)
 
+create_db_task >> extract_data_task >> transform_data_task >> load_data_task >> alert_task
 
 

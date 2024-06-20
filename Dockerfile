@@ -1,4 +1,3 @@
-# Usar la imagen base de Airflow con Python 3.8
 FROM apache/airflow:2.1.4-python3.8
 
 # Instalar las dependencias necesarias
@@ -7,17 +6,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar los archivos del proyecto al directorio de dags de Airflow
 COPY dags/ /opt/airflow/dags/
-COPY scripts/ /opt/airflow/dags/scripts/
-COPY config/ /opt/airflow/dags/config/
-COPY my_database.db /opt/airflow/dags/my_database.db
-
-# Copiar y cambiar permisos del script de entrada
+COPY scripts/ /opt/airflow/scripts/
 COPY entrypoint.sh /entrypoint.sh
-USER root
+
+# Hacer el script ejecutable
 RUN chmod +x /entrypoint.sh
-USER airflow
 
 # Usar el script como punto de entrada
 ENTRYPOINT ["/entrypoint.sh"]
 
+# Inicializar Airflow
+RUN airflow db init
+
+# Crear el usuario admin de Airflow
+RUN airflow users create --username admin --password admin --firstname Admin --lastname Admin --role Admin --email admin@example.com
+
+# Ejecutar el scheduler y el webserver
+CMD ["sh", "-c", "airflow scheduler & airflow webserver"]
 
